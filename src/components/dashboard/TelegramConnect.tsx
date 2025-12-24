@@ -209,7 +209,7 @@ export function TelegramConnect() {
                   <span className="text-foreground">
                     Abra o bot{" "}
                     <a
-                      href="https://t.me/ContaFlowIA_bot"
+                      href="https://t.me/F1747_bot"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline font-medium"
