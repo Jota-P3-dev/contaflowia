@@ -63,18 +63,26 @@ export function AIAssistant() {
     };
 
     try {
+      // Get the current session token for authenticated requests
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession?.access_token) {
+        upsertAssistant("Você precisa estar logado para usar o assistente. Faça login novamente!");
+        setIsLoading(false);
+        return;
+      }
+
       const response = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${currentSession.access_token}`,
         },
         body: JSON.stringify({
           messages: [...messages, userMessage].map((m) => ({
             role: m.role,
             content: m.content,
           })),
-          userId: session?.user?.id,
         }),
       });
 
