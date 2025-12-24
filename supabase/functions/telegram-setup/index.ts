@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,12 +12,42 @@ serve(async (req) => {
   }
 
   try {
+    // Validate JWT token - this function requires authentication
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Verify the user's token
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("Authenticated user for telegram-setup:", user.id);
+
     const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 
     if (!TELEGRAM_BOT_TOKEN) {
-      return new Response(JSON.stringify({ error: "TELEGRAM_BOT_TOKEN not configured" }), {
-        status: 500,
+      console.error("Configuration error: TELEGRAM_BOT_TOKEN not set");
+      return new Response(JSON.stringify({ error: "Service temporarily unavailable" }), {
+        status: 503,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -25,7 +56,7 @@ serve(async (req) => {
 
     if (action === "set") {
       // Set webhook
-      const webhookUrl = `${SUPABASE_URL}/functions/v1/telegram-webhook`;
+      const webhookUrl = `${supabaseUrl}/functions/v1/telegram-webhook`;
       const response = await fetch(
         `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`,
         {
@@ -68,9 +99,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error:", error);
+    const errorId = crypto.randomUUID();
+    console.error(`Telegram setup error [${errorId}]:`, error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "An error occurred", error_id: errorId }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
