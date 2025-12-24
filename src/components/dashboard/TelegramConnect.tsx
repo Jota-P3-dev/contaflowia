@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, Copy, Check, RefreshCw, X, ExternalLink, Link } from "lucide-react";
+import { MessageCircle, Copy, Check, RefreshCw, X, ExternalLink, Type } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -106,7 +106,7 @@ export function TelegramConnect() {
           generateLinkCode();
         }
       }}>
-          <Link className="w-5 h-5 text-muted-foreground" />
+          <Type className="w-5 h-5 text-muted-foreground" />
           {isConnected && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-green-500 rounded-full" />}
         </button>
       </DialogTrigger>
