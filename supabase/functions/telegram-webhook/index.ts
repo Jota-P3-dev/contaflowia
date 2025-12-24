@@ -77,31 +77,39 @@ Lazer disponível: R$ ${leisureRemaining.toFixed(2)}
   };
 }
 
-async function callFIN(apiKey: string, userContext: string, message: string) {
+async function callFIN(userContext: string, message: string) {
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) {
+    console.error("Configuration error: OPENAI_API_KEY not set");
+    return "Tô sem acesso à IA agora 😕 (configuração faltando). Tenta de novo em instantes!";
+  }
+
+  const model = Deno.env.get("OPENAI_MODEL") ?? "gpt-4o-mini";
   const systemPrompt = FIN_TELEGRAM_PROMPT.replace("{userContext}", userContext);
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: message },
       ],
+      temperature: 0.7,
     }),
   });
 
   if (!response.ok) {
-    console.error("AI error:", await response.text());
+    console.error("OpenAI error:", await response.text());
     return "Desculpe, estou com dificuldades técnicas. Tente novamente em instantes! 🔧";
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || "Desculpe, não consegui processar sua mensagem.";
+  return data.choices?.[0]?.message?.content?.trim() || "Desculpe, não consegui processar sua mensagem.";
 }
 
 serve(async (req) => {
@@ -111,17 +119,11 @@ serve(async (req) => {
 
   try {
     const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     if (!TELEGRAM_BOT_TOKEN) {
       console.error("Configuration error: TELEGRAM_BOT_TOKEN not set");
-      return new Response(JSON.stringify({ error: "Service temporarily unavailable" }), { status: 503 });
-    }
-
-    if (!LOVABLE_API_KEY) {
-      console.error("Configuration error: LOVABLE_API_KEY not set");
       return new Response(JSON.stringify({ error: "Service temporarily unavailable" }), { status: 503 });
     }
 
@@ -357,8 +359,8 @@ serve(async (req) => {
       }
     }
 
-    // Default: Chat with FIN
-    const finResponse = await callFIN(LOVABLE_API_KEY, context, text);
+    // Default: Chat with FIN (OpenAI)
+    const finResponse = await callFIN(context, text);
     await sendTelegramMessage(TELEGRAM_BOT_TOKEN, chatId, finResponse);
 
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
