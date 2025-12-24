@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TelegramConnect } from "./TelegramConnect";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export function Header() {
   const { user, signOut } = useAuth();
@@ -70,6 +71,9 @@ export function Header() {
               <span className="text-sm text-foreground">Dezembro 2024</span>
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </button>
+
+            {/* Theme Toggle */}
+            <ThemeToggle />
 
             {/* Telegram Connect */}
             <TelegramConnect />
