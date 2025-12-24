@@ -32,6 +32,25 @@ Se detectar uma intenção de registro de despesa, responda confirmando o regist
 - Sempre termine com uma pergunta ou sugestão
 - Lembre-se: você está no Telegram, seja direto!`;
 
+// --- Short-term memory (RAM) ---
+// Keeps last N messages per user (in-memory). Resets on cold start.
+type ChatMsg = { role: "user" | "assistant"; content: string };
+const MEMORY_MAX_MESSAGES = 6; // 4–6 is good. We'll use 6.
+const conversationMemory = new Map<string, ChatMsg[]>();
+
+function getMemory(userId: string): ChatMsg[] {
+  return conversationMemory.get(userId) ?? [];
+}
+
+function pushMemory(userId: string, msg: ChatMsg) {
+  const current = conversationMemory.get(userId) ?? [];
+  current.push(msg);
+  if (current.length > MEMORY_MAX_MESSAGES) {
+    current.splice(0, current.length - MEMORY_MAX_MESSAGES);
+  }
+  conversationMemory.set(userId, current);
+}
+
 async function sendTelegramMessage(botToken: string, chatId: number, text: string) {
   const response = await fetch(`${TELEGRAM_API}${botToken}/sendMessage`, {
     method: "POST",
@@ -77,7 +96,7 @@ Lazer disponível: R$ ${leisureRemaining.toFixed(2)}
   };
 }
 
-async function callFIN(userContext: string, message: string) {
+async function callFIN(userContext: string, history: ChatMsg[], message: string) {
   const apiKey = Deno.env.get("OPENAI_API_KEY");
   if (!apiKey) {
     console.error("Configuration error: OPENAI_API_KEY not set");
@@ -97,6 +116,7 @@ async function callFIN(userContext: string, message: string) {
       model,
       messages: [
         { role: "system", content: systemPrompt },
+        ...history,
         { role: "user", content: message },
       ],
       temperature: 0.7,
@@ -286,7 +306,6 @@ serve(async (req) => {
         const amount = parseFloat(match[1].replace(",", "."));
         let description = match[2].trim();
 
-        // Validate amount - must be between 0.01 and 1,000,000
         if (isNaN(amount) || amount < 0.01 || amount > 1000000) {
           await sendTelegramMessage(
             TELEGRAM_BOT_TOKEN,
@@ -296,12 +315,10 @@ serve(async (req) => {
           return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
         }
 
-        // Sanitize description - limit to 200 characters
         if (description.length > 200) {
           description = description.substring(0, 200);
         }
 
-        // Remove any potentially harmful characters from description
         description = description.replace(/[<>\"'&]/g, "");
 
         if (!description || description.length < 1) {
@@ -313,7 +330,6 @@ serve(async (req) => {
           return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
         }
 
-        // Insert transaction
         const { error: insertError } = await supabase.from("transactions").insert({
           user_id: userId,
           amount: amount,
@@ -326,7 +342,6 @@ serve(async (req) => {
           console.error("Error inserting transaction:", insertError);
           await sendTelegramMessage(TELEGRAM_BOT_TOKEN, chatId, "❌ Erro ao registrar despesa. Tente novamente!");
         } else {
-          // Update leisure spent if applicable
           const { data: leisure } = await supabase
             .from("leisure_budget")
             .select("*")
@@ -359,8 +374,17 @@ serve(async (req) => {
       }
     }
 
-    // Default: Chat with FIN (OpenAI)
-    const finResponse = await callFIN(context, text);
+    // Default: Chat with FIN (OpenAI) + short-term memory
+    const history = getMemory(userId);
+
+    // save user's message into memory
+    pushMemory(userId, { role: "user", content: text });
+
+    const finResponse = await callFIN(context, history, text);
+
+    // save assistant response into memory
+    pushMemory(userId, { role: "assistant", content: finResponse });
+
     await sendTelegramMessage(TELEGRAM_BOT_TOKEN, chatId, finResponse);
 
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
