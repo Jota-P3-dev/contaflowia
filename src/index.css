@@ -6,8 +6,8 @@
 
 @layer base {
   :root {
-    /* Light Theme */
-    --background: 0 0% 98%;
+    /* Light Theme - Improved Contrast */
+    --background: 220 14% 94%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -16,48 +16,48 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 270 70% 55%;
+    --primary: 270 70% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 280 60% 60%;
+    --secondary: 280 60% 55%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 14% 92%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 220 14% 88%;
+    --muted-foreground: 220 9% 40%;
 
-    --accent: 320 70% 55%;
+    --accent: 320 70% 50%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 84% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 87%;
-    --input: 220 13% 91%;
-    --ring: 270 70% 55%;
+    --border: 220 13% 78%;
+    --input: 220 13% 85%;
+    --ring: 270 70% 50%;
 
     --radius: 1rem;
 
     /* Custom colors - Light */
-    --cyan: 186 80% 42%;
-    --cyan-glow: 186 80% 55%;
-    --magenta: 320 70% 50%;
-    --magenta-glow: 320 70% 65%;
-    --purple: 270 70% 55%;
-    --purple-glow: 270 70% 70%;
-    --success: 142 76% 36%;
-    --warning: 38 92% 50%;
+    --cyan: 186 80% 38%;
+    --cyan-glow: 186 80% 50%;
+    --magenta: 320 70% 45%;
+    --magenta-glow: 320 70% 60%;
+    --purple: 270 70% 50%;
+    --purple-glow: 270 70% 65%;
+    --success: 142 76% 32%;
+    --warning: 38 92% 45%;
 
     /* Gradients - Light */
     --gradient-primary: linear-gradient(135deg, hsl(var(--purple)) 0%, hsl(var(--magenta)) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(var(--magenta)) 0%, hsl(var(--purple)) 100%);
     --gradient-success: linear-gradient(135deg, hsl(var(--success)) 0%, hsl(var(--cyan)) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100% / 0.9) 0%, hsl(220 14% 96% / 0.95) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100% / 0.95) 0%, hsl(220 14% 94% / 0.98) 100%);
 
     /* Shadows - Light */
-    --shadow-glow-cyan: 0 4px 20px hsl(var(--cyan) / 0.2);
-    --shadow-glow-magenta: 0 4px 20px hsl(var(--magenta) / 0.2);
-    --shadow-glow-purple: 0 4px 20px hsl(var(--purple) / 0.2);
-    --shadow-card: 0 4px 24px hsl(220 13% 50% / 0.1);
+    --shadow-glow-cyan: 0 4px 20px hsl(var(--cyan) / 0.25);
+    --shadow-glow-magenta: 0 4px 20px hsl(var(--magenta) / 0.25);
+    --shadow-glow-purple: 0 4px 20px hsl(var(--purple) / 0.25);
+    --shadow-card: 0 4px 24px hsl(220 13% 40% / 0.12);
   }
 
   .dark {
@@ -142,11 +142,19 @@
 
 @layer utilities {
   .glass {
-    @apply bg-card/60 backdrop-blur-xl border border-border/50;
+    @apply bg-card/80 backdrop-blur-xl border border-border/60 shadow-sm;
+  }
+
+  :root:not(.dark) .glass {
+    @apply bg-card/90 border-border/70;
   }
 
   .glass-strong {
-    @apply bg-card/80 backdrop-blur-2xl border border-border/60;
+    @apply bg-card/90 backdrop-blur-2xl border border-border/70 shadow-md;
+  }
+
+  :root:not(.dark) .glass-strong {
+    @apply bg-card/95 border-border/80;
   }
 
   .gradient-text {
