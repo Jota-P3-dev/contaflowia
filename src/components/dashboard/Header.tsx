@@ -1,8 +1,26 @@
 import { motion } from "framer-motion";
-import { Bell, Search, Menu, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Bell, Search, Menu, ChevronDown, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Header() {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
+  };
+
+  const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
+  const initials = userName.slice(0, 2).toUpperCase();
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -19,12 +37,12 @@ export function Header() {
             </button>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan via-purple to-magenta flex items-center justify-center">
-                <span className="text-xl font-bold text-background">F</span>
+                <span className="text-xl font-bold text-background">C</span>
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-lg font-bold gradient-text">FinanceAI</h1>
+                <h1 className="text-lg font-bold gradient-text">ContaFlow IA</h1>
                 <p className="text-xs text-muted-foreground">
-                  Dashboard Inteligente
+                  Seu parceiro financeiro
                 </p>
               </div>
             </div>
@@ -57,14 +75,24 @@ export function Header() {
             </button>
 
             {/* Profile */}
-            <button className="flex items-center gap-2 p-1 pr-3 rounded-xl hover:bg-muted transition-colors">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan/30 to-purple/30 flex items-center justify-center">
-                <span className="text-sm font-semibold text-foreground">JD</span>
-              </div>
-              <span className="hidden sm:block text-sm font-medium text-foreground">
-                João
-              </span>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 p-1 pr-3 rounded-xl hover:bg-muted transition-colors">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan/30 to-purple/30 flex items-center justify-center">
+                    <span className="text-sm font-semibold text-foreground">{initials}</span>
+                  </div>
+                  <span className="hidden sm:block text-sm font-medium text-foreground">
+                    {userName}
+                  </span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

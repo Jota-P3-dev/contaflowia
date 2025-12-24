@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, Sparkles, X, MessageCircle } from "lucide-react";
+import { Send, Sparkles, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -9,22 +11,28 @@ interface Message {
   content: string;
 }
 
-const initialMessages: Message[] = [
-  {
-    id: "1",
-    role: "assistant",
-    content:
-      "Olá! Sou sua assistente financeira com IA. Analisei seus dados e tenho algumas sugestões:\n\n✨ Você está 57% mais perto da sua viagem à Europa!\n\n💡 Dica: Se reduzir R$150 em cafés mensais, você alcança sua meta 2 meses antes.",
-  },
-];
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      role: "assistant",
+      content: "Oi! Sou o FIN, seu assistente financeiro 👋\n\nEstou aqui pra te ajudar a conquistar sua liberdade financeira. Pode me perguntar qualquer coisa sobre suas finanças!",
+    },
+  ]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { session } = useAuth();
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -34,17 +42,94 @@ export function AIAssistant() {
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setIsLoading(true);
 
-    // Simulated AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content:
-          "Entendi sua pergunta! Com base no seu padrão de gastos, sugiro criar uma reserva de emergência equivalente a 6 meses de despesas. Isso daria cerca de R$24.000. Posso montar um plano personalizado para você alcançar isso em 12 meses. Deseja que eu faça?",
-      };
-      setMessages((prev) => [...prev, aiResponse]);
-    }, 1000);
+    let assistantContent = "";
+
+    const upsertAssistant = (chunk: string) => {
+      assistantContent += chunk;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && last.id.startsWith("stream-")) {
+          return prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, content: assistantContent } : m
+          );
+        }
+        return [
+          ...prev,
+          { id: `stream-${Date.now()}`, role: "assistant", content: assistantContent },
+        ];
+      });
+    };
+
+    try {
+      const response = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          userId: session?.user?.id,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          upsertAssistant("Estou recebendo muitas mensagens agora. Tente novamente em alguns segundos! 🙏");
+        } else if (response.status === 402) {
+          upsertAssistant("Ops! Parece que os créditos de IA acabaram. Entre em contato com o suporte.");
+        } else {
+          upsertAssistant("Desculpe, tive um problema ao processar sua mensagem. Tente novamente!");
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+          let line = buffer.slice(0, newlineIndex);
+          buffer = buffer.slice(newlineIndex + 1);
+
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) upsertAssistant(content);
+          } catch {
+            buffer = line + "\n" + buffer;
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      upsertAssistant("Desculpe, tive um problema de conexão. Tente novamente!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -62,7 +147,7 @@ export function AIAssistant() {
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
       >
-        <Bot className="w-6 h-6 text-background" />
+        <span className="text-lg font-bold text-background">FIN</span>
       </motion.button>
 
       {/* Chat Window */}
@@ -84,14 +169,12 @@ export function AIAssistant() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan to-purple flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-background" />
+                    <span className="text-sm font-bold text-background">FIN</span>
                   </div>
                   <div>
-                    <h4 className="font-semibold text-foreground">
-                      Assistente IA
-                    </h4>
+                    <h4 className="font-semibold text-foreground">FIN</h4>
                     <p className="text-xs text-muted-foreground">
-                      Sempre online para ajudar
+                      Seu assistente financeiro
                     </p>
                   </div>
                 </div>
@@ -128,6 +211,18 @@ export function AIAssistant() {
                   </div>
                 </motion.div>
               ))}
+              {isLoading && messages[messages.length - 1]?.role === "user" && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex justify-start"
+                >
+                  <div className="bg-muted/50 rounded-2xl rounded-bl-md px-4 py-3">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                </motion.div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Input */}
@@ -139,13 +234,15 @@ export function AIAssistant() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   placeholder="Pergunte sobre suas finanças..."
-                  className="flex-1 bg-muted/50 border border-border/50 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  disabled={isLoading}
+                  className="flex-1 bg-muted/50 border border-border/50 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-50"
                 />
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleSend}
-                  className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan to-purple flex items-center justify-center hover:opacity-90 transition-opacity"
+                  disabled={isLoading || !input.trim()}
+                  className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan to-purple flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   <Send className="w-4 h-4 text-background" />
                 </motion.button>
