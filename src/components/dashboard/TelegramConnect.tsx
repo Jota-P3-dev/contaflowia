@@ -184,7 +184,7 @@ export function TelegramConnect() {
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => window.open("https://t.me/ContaFlowIA_bot", "_blank")}
+                  onClick={() => window.open("https://t.me/F1747_bot", "_blank")}
                 >
                   <ExternalLink className="w-4 h-4 mr-1" />
                   Abrir Bot
