@@ -362,9 +362,9 @@ export default function Auth() {
                             <SelectTrigger className="h-12 rounded-full border-[hsl(320,30%,85%)] bg-[hsl(320,30%,97%)] focus:ring-[hsl(320,50%,60%)] text-gray-700">
                               <SelectValue placeholder="UF" />
                             </SelectTrigger>
-                            <SelectContent className="bg-white border-[hsl(320,30%,85%)]">
+                            <SelectContent className="bg-white border-[hsl(320,30%,85%)] shadow-lg z-50">
                               {brazilianStates.map((state) => (
-                                <SelectItem key={state.uf} value={state.uf}>
+                                <SelectItem key={state.uf} value={state.uf} className="text-gray-700 hover:bg-[hsl(320,30%,95%)] focus:bg-[hsl(320,50%,60%)] focus:text-white cursor-pointer">
                                   {state.uf} - {state.name}
                                 </SelectItem>
                               ))}
