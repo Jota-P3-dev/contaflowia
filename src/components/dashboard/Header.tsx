@@ -2,36 +2,32 @@ import { motion } from "framer-motion";
 import { Bell, Search, Menu, ChevronDown, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TelegramConnect } from "./TelegramConnect";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-
 export function Header() {
-  const { user, signOut } = useAuth();
+  const {
+    user,
+    signOut
+  } = useAuth();
   const navigate = useNavigate();
-
   const handleSignOut = async () => {
     await signOut();
     navigate("/auth");
   };
-
   const fullName = user?.user_metadata?.name || "";
   const preferredName = user?.user_metadata?.preferred_name;
   const displayName = preferredName || fullName.split(" ")[0] || user?.email?.split("@")[0] || "Usuário";
   const initials = displayName.slice(0, 2).toUpperCase();
-
-  return (
-    <motion.header
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="glass-strong sticky top-0 z-40 border-b border-border/50"
-    >
+  return <motion.header initial={{
+    opacity: 0,
+    y: -20
+  }} animate={{
+    opacity: 1,
+    y: 0
+  }} transition={{
+    duration: 0.5
+  }} className="glass-strong sticky top-0 z-40 border-b border-border/50">
       <div className="container mx-auto px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo & Title */}
@@ -56,11 +52,7 @@ export function Header() {
           <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Buscar transações, metas..."
-                className="w-full bg-muted/50 border border-border/50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-              />
+              <input type="text" placeholder="Buscar transações, metas..." className="w-full bg-muted/50 border border-border/50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all" />
             </div>
           </div>
 
@@ -68,7 +60,7 @@ export function Header() {
           <div className="flex items-center gap-3">
             {/* Period Selector */}
             <button className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-border/50 hover:border-primary/50 transition-colors">
-              <span className="text-sm text-foreground">Dezembro 2024</span>
+              <span className="text-sm text-foreground">Dezembro 2025</span>
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </button>
 
@@ -106,6 +98,5 @@ export function Header() {
           </div>
         </div>
       </div>
-    </motion.header>
-  );
+    </motion.header>;
 }
