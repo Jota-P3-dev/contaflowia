@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Helmet } from "react-helmet-async";
 import { 
   Sparkles, ArrowRight, ArrowLeft, Loader2, Plus, X,
-  User, Wallet, Receipt, CreditCard, Target, Heart
+  Wallet, Receipt, CreditCard, Target, Heart
 } from "lucide-react";
 
 interface IncomeSource {
@@ -35,17 +35,15 @@ interface Goal {
 }
 
 const steps = [
-  { id: 1, title: "Boas-vindas", icon: User },
-  { id: 2, title: "Sua renda", icon: Wallet },
-  { id: 3, title: "Gastos fixos", icon: Receipt },
-  { id: 4, title: "Dívidas", icon: CreditCard },
-  { id: 5, title: "Sonhos e lazer", icon: Target },
+  { id: 1, title: "Sua renda", icon: Wallet },
+  { id: 2, title: "Gastos fixos", icon: Receipt },
+  { id: 3, title: "Dívidas", icon: CreditCard },
+  { id: 4, title: "Sonhos e lazer", icon: Target },
 ];
 
 export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [name, setName] = useState("");
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([{ name: "", amount: "" }]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([{ name: "", amount: "" }]);
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -56,6 +54,11 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Get user's preferred name or first name
+  const preferredName = user?.user_metadata?.preferred_name;
+  const fullName = user?.user_metadata?.name || "";
+  const displayName = preferredName || fullName.split(" ")[0] || "você";
+
   useEffect(() => {
     if (!user) {
       navigate("/auth");
@@ -63,8 +66,7 @@ export default function Onboarding() {
   }, [user, navigate]);
 
   const finMessages = [
-    "Oi! Sou o FIN 👋 Vamos começar essa jornada juntos? Me conta um pouco sobre você!",
-    "Legal te conhecer! Agora me conta: como entra dinheiro na sua vida? Pode ser salário, freelas, pensão...",
+    `Olá, ${displayName}! 👋 Me conta: como entra dinheiro na sua vida? Pode ser salário, freelas, pensão...`,
     "Perfeito! Agora vamos ver o que sai todo mês. Sem julgamentos aqui, tá? 😊",
     "Sei que essa parte pode ser difícil. Respira, tô aqui pra ajudar. Quais dívidas você tem hoje?",
     "O mais importante: o que te faz feliz? Seus sonhos, suas metas... e quanto você quer proteger pra lazer? 🌟"
@@ -105,7 +107,7 @@ export default function Onboarding() {
   };
 
   const handleNext = () => {
-    if (currentStep < 5) {
+    if (currentStep < 4) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -131,7 +133,6 @@ export default function Onboarding() {
       await supabase
         .from("profiles")
         .update({
-          name,
           monthly_income: totalIncome,
           onboarding_completed: true
         })
@@ -219,20 +220,6 @@ export default function Onboarding() {
       case 1:
         return (
           <div className="space-y-4">
-            <Label htmlFor="name">Como posso te chamar?</Label>
-            <Input
-              id="name"
-              placeholder="Seu nome"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="text-lg"
-            />
-          </div>
-        );
-
-      case 2:
-        return (
-          <div className="space-y-4">
             <Label>Suas fontes de renda</Label>
             {incomeSources.map((source, index) => (
               <div key={index} className="flex gap-2">
@@ -276,7 +263,7 @@ export default function Onboarding() {
           </div>
         );
 
-      case 3:
+      case 2:
         return (
           <div className="space-y-4">
             <Label>Gastos fixos mensais</Label>
@@ -322,7 +309,7 @@ export default function Onboarding() {
           </div>
         );
 
-      case 4:
+      case 3:
         return (
           <div className="space-y-4">
             <Label>Suas dívidas atuais (pode pular se não tiver)</Label>
@@ -385,7 +372,7 @@ export default function Onboarding() {
           </div>
         );
 
-      case 5:
+      case 4:
         return (
           <div className="space-y-6">
             <div className="space-y-4">
@@ -526,7 +513,7 @@ export default function Onboarding() {
                 Voltar
               </Button>
 
-              {currentStep < 5 ? (
+              {currentStep < 4 ? (
                 <Button
                   onClick={handleNext}
                   className="bg-gradient-to-r from-cyan to-purple hover:opacity-90"

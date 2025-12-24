@@ -238,33 +238,51 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          birth_date: string | null
+          city: string | null
           created_at: string
+          gender: string | null
           id: string
           monthly_income: number | null
           name: string | null
           onboarding_completed: boolean | null
+          phone: string | null
+          preferred_name: string | null
+          state: string | null
           telegram_chat_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
+          birth_date?: string | null
+          city?: string | null
           created_at?: string
+          gender?: string | null
           id?: string
           monthly_income?: number | null
           name?: string | null
           onboarding_completed?: boolean | null
+          phone?: string | null
+          preferred_name?: string | null
+          state?: string | null
           telegram_chat_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
+          birth_date?: string | null
+          city?: string | null
           created_at?: string
+          gender?: string | null
           id?: string
           monthly_income?: number | null
           name?: string | null
           onboarding_completed?: boolean | null
+          phone?: string | null
+          preferred_name?: string | null
+          state?: string | null
           telegram_chat_id?: string | null
           updated_at?: string
           user_id?: string
