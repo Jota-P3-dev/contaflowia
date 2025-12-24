@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, X, Loader2 } from "lucide-react";
+import { Send, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEditNotification } from "@/contexts/EditNotificationContext";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
@@ -24,12 +25,67 @@ export function AIAssistant() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasNotification, setHasNotification] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { session } = useAuth();
+  const { pendingNotification, clearNotification } = useEditNotification();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Detectar mudanças e gerar mensagem automática
+  useEffect(() => {
+    if (pendingNotification) {
+      const { type, action, itemName, oldValue, newValue } = pendingNotification;
+      
+      let aiMessage = "";
+      
+      const typeLabels: Record<string, string> = {
+        goal: "objetivo",
+        transaction: "transação",
+        leisure: "orçamento de lazer",
+      };
+      
+      const typeLabel = typeLabels[type] || type;
+      
+      if (action === "create") {
+        aiMessage = `Percebi que você criou um novo ${typeLabel}: "${itemName}" 🎉\n\nQuer me contar mais sobre essa decisão? Posso te ajudar a planejar melhor!`;
+      } else if (action === "update") {
+        if (oldValue !== undefined && newValue !== undefined) {
+          aiMessage = `Vi que você ajustou ${typeLabel === "objetivo" ? "o" : "a"} ${typeLabel} "${itemName}" de R$ ${Number(oldValue).toLocaleString("pt-BR")} para R$ ${Number(newValue).toLocaleString("pt-BR")} 📝\n\nO que motivou essa mudança? Posso te ajudar a entender o impacto no seu planejamento!`;
+        } else {
+          aiMessage = `Vi que você atualizou ${typeLabel === "objetivo" ? "o" : "a"} ${typeLabel} "${itemName}" 📝\n\nQuer me contar sobre a mudança?`;
+        }
+      } else if (action === "delete") {
+        aiMessage = `Notei que você removeu ${typeLabel === "objetivo" ? "o" : "a"} ${typeLabel} "${itemName}" 🗑️\n\nFoi uma decisão planejada? Posso te ajudar a reorganizar suas finanças se precisar!`;
+      }
+
+      if (aiMessage) {
+        const newMessage: Message = {
+          id: `notification-${Date.now()}`,
+          role: "assistant",
+          content: aiMessage,
+        };
+        setMessages((prev) => [...prev, newMessage]);
+        setHasNotification(true);
+        
+        // Abrir o chat automaticamente se estiver fechado
+        if (!isOpen) {
+          setTimeout(() => setIsOpen(true), 500);
+        }
+      }
+      
+      clearNotification();
+    }
+  }, [pendingNotification, clearNotification, isOpen]);
+
+  // Limpar notificação quando abrir o chat
+  useEffect(() => {
+    if (isOpen && hasNotification) {
+      setHasNotification(false);
+    }
+  }, [isOpen, hasNotification]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -63,7 +119,6 @@ export function AIAssistant() {
     };
 
     try {
-      // Get the current session token for authenticated requests
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       
       if (!currentSession?.access_token) {
@@ -156,6 +211,9 @@ export function AIAssistant() {
         whileTap={{ scale: 0.95 }}
       >
         <span className="text-lg font-bold text-background">FIN</span>
+        {hasNotification && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive rounded-full animate-pulse" />
+        )}
       </motion.button>
 
       {/* Chat Window */}
