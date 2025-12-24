@@ -1,33 +1,95 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, UserSignupData } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Helmet } from "react-helmet-async";
-import { Sparkles, Mail, Lock, User, ArrowRight, Loader2 } from "lucide-react";
+import { Sparkles, Mail, Lock, User, ArrowRight, Loader2, Calendar, Phone, MapPin, Heart } from "lucide-react";
 import { z } from "zod";
+import { brazilianStates, genderOptions } from "@/data/brazilianStates";
 
 const emailSchema = z.string().email("Email inválido");
 const passwordSchema = z.string().min(6, "Senha deve ter no mínimo 6 caracteres");
-const nameSchema = z.string().min(2, "Nome deve ter no mínimo 2 caracteres");
+const nameSchema = z.string().min(3, "Nome deve ter no mínimo 3 caracteres");
+const phoneSchema = z.string().regex(/^\(\d{2}\)\s?\d{4,5}-\d{4}$/, "Telefone inválido. Use o formato (XX) XXXXX-XXXX");
+
+const calculateAge = (birthDate: string): number => {
+  const today = new Date();
+  const birth = new Date(birthDate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+const formatPhone = (value: string): string => {
+  const numbers = value.replace(/\D/g, "");
+  if (numbers.length <= 2) return numbers.length ? `(${numbers}` : "";
+  if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+  if (numbers.length <= 11) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+  return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+};
+
+interface FormErrors {
+  email?: string;
+  password?: string;
+  name?: string;
+  preferredName?: string;
+  gender?: string;
+  birthDate?: string;
+  phone?: string;
+  state?: string;
+  city?: string;
+}
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [preferredName, setPreferredName] = useState("");
+  const [gender, setGender] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [phone, setPhone] = useState("");
+  const [selectedState, setSelectedState] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; name?: string }>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const validate = () => {
-    const newErrors: { email?: string; password?: string; name?: string } = {};
+  // Get capital based on selected state
+  const stateCapital = useMemo(() => {
+    const state = brazilianStates.find(s => s.uf === selectedState);
+    return state?.capital || "";
+  }, [selectedState]);
+
+  // When state changes, auto-select capital
+  const handleStateChange = (value: string) => {
+    setSelectedState(value);
+    const state = brazilianStates.find(s => s.uf === value);
+    if (state) {
+      setSelectedCity(state.capital);
+    }
+  };
+
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {};
     
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
@@ -43,6 +105,32 @@ export default function Auth() {
       const nameResult = nameSchema.safeParse(name);
       if (!nameResult.success) {
         newErrors.name = nameResult.error.errors[0].message;
+      }
+
+      if (!gender) {
+        newErrors.gender = "Selecione uma opção";
+      }
+
+      if (!birthDate) {
+        newErrors.birthDate = "Data de nascimento é obrigatória";
+      } else {
+        const age = calculateAge(birthDate);
+        if (age < 18) {
+          newErrors.birthDate = "Você deve ter pelo menos 18 anos";
+        }
+      }
+
+      const phoneResult = phoneSchema.safeParse(phone);
+      if (!phoneResult.success) {
+        newErrors.phone = phoneResult.error.errors[0].message;
+      }
+
+      if (!selectedState) {
+        newErrors.state = "Selecione um estado";
+      }
+
+      if (!selectedCity) {
+        newErrors.city = "Selecione uma cidade";
       }
     }
     
@@ -82,7 +170,17 @@ export default function Auth() {
           navigate("/");
         }
       } else {
-        const { error } = await signUp(email, password, name);
+        const userData: UserSignupData = {
+          name,
+          preferredName: preferredName || undefined,
+          gender,
+          birthDate,
+          phone,
+          state: selectedState,
+          city: selectedCity,
+        };
+
+        const { error } = await signUp(email, password, userData);
         if (error) {
           if (error.message.includes("User already registered")) {
             toast({
@@ -108,6 +206,10 @@ export default function Auth() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(formatPhone(e.target.value));
   };
 
   return (
@@ -144,33 +246,163 @@ export default function Auth() {
             className="glass-strong rounded-2xl p-6 border border-primary/20"
           >
             <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-2"
-                >
-                  <Label htmlFor="name">Nome</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="Seu nome"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  {errors.name && (
-                    <p className="text-sm text-destructive">{errors.name}</p>
-                  )}
-                </motion.div>
-              )}
+              <AnimatePresence mode="wait">
+                {!isLogin && (
+                  <motion.div
+                    key="signup-fields"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4"
+                  >
+                    {/* Nome Completo */}
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nome completo *</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="name"
+                          type="text"
+                          placeholder="Seu nome completo"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      {errors.name && (
+                        <p className="text-sm text-destructive">{errors.name}</p>
+                      )}
+                    </div>
 
+                    {/* Nome Preferido */}
+                    <div className="space-y-2">
+                      <Label htmlFor="preferredName">
+                        Como você gostaria de ser chamado?
+                      </Label>
+                      <div className="relative">
+                        <Heart className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="preferredName"
+                          type="text"
+                          placeholder="Apelido ou nome social (opcional)"
+                          value={preferredName}
+                          onChange={(e) => setPreferredName(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Se deixar em branco, usaremos seu primeiro nome
+                      </p>
+                    </div>
+
+                    {/* Sexo */}
+                    <div className="space-y-3">
+                      <Label>Sexo *</Label>
+                      <RadioGroup
+                        value={gender}
+                        onValueChange={setGender}
+                        className="grid grid-cols-2 gap-2"
+                      >
+                        {genderOptions.map((option) => (
+                          <div key={option.value} className="flex items-center space-x-2">
+                            <RadioGroupItem value={option.value} id={option.value} />
+                            <Label htmlFor={option.value} className="text-sm font-normal cursor-pointer">
+                              {option.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                      {errors.gender && (
+                        <p className="text-sm text-destructive">{errors.gender}</p>
+                      )}
+                    </div>
+
+                    {/* Data de Nascimento */}
+                    <div className="space-y-2">
+                      <Label htmlFor="birthDate">Data de nascimento *</Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="birthDate"
+                          type="date"
+                          value={birthDate}
+                          onChange={(e) => setBirthDate(e.target.value)}
+                          className="pl-10"
+                          max={new Date().toISOString().split("T")[0]}
+                        />
+                      </div>
+                      {errors.birthDate && (
+                        <p className="text-sm text-destructive">{errors.birthDate}</p>
+                      )}
+                    </div>
+
+                    {/* Estado e Cidade */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Estado *</Label>
+                        <Select value={selectedState} onValueChange={handleStateChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="UF" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {brazilianStates.map((state) => (
+                              <SelectItem key={state.uf} value={state.uf}>
+                                {state.uf} - {state.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {errors.state && (
+                          <p className="text-sm text-destructive">{errors.state}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Cidade *</Label>
+                        <div className="relative">
+                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
+                          <Input
+                            type="text"
+                            placeholder={stateCapital || "Cidade"}
+                            value={selectedCity}
+                            onChange={(e) => setSelectedCity(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                        {errors.city && (
+                          <p className="text-sm text-destructive">{errors.city}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Telefone */}
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Telefone *</Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="(XX) XXXXX-XXXX"
+                          value={phone}
+                          onChange={handlePhoneChange}
+                          className="pl-10"
+                          maxLength={15}
+                        />
+                      </div>
+                      {errors.phone && (
+                        <p className="text-sm text-destructive">{errors.phone}</p>
+                      )}
+                    </div>
+
+                    <div className="border-t border-border/50 pt-4 mt-4" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email {!isLogin && "*"}</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -187,8 +419,9 @@ export default function Auth() {
                 )}
               </div>
 
+              {/* Senha */}
               <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
+                <Label htmlFor="password">Senha {!isLogin && "*"}</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -257,7 +490,7 @@ export default function Auth() {
                 <span className="text-sm font-bold text-background">FIN</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Oi! Sou o <span className="text-primary font-medium">FIN</span>, seu assistente financeiro. Vamos juntos conquistar sua liberdade financeira! 👋
+                Oi! Sou o <span className="text-primary font-medium">FIN</span>, seu assistente financeiro. Vamos juntos conquistar sua liberdade financeira!
               </p>
             </div>
           </motion.div>

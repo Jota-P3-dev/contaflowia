@@ -19,8 +19,10 @@ export function Header() {
     navigate("/auth");
   };
 
-  const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
-  const initials = userName.slice(0, 2).toUpperCase();
+  const fullName = user?.user_metadata?.name || "";
+  const preferredName = user?.user_metadata?.preferred_name;
+  const displayName = preferredName || fullName.split(" ")[0] || user?.email?.split("@")[0] || "Usuário";
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <motion.header
@@ -86,7 +88,7 @@ export function Header() {
                     <span className="text-sm font-semibold text-foreground">{initials}</span>
                   </div>
                   <span className="hidden sm:block text-sm font-medium text-foreground">
-                    {userName}
+                    {displayName}
                   </span>
                 </button>
               </DropdownMenuTrigger>
