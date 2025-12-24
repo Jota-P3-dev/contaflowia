@@ -116,13 +116,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     if (!TELEGRAM_BOT_TOKEN) {
-      console.error("TELEGRAM_BOT_TOKEN not configured");
-      return new Response(JSON.stringify({ error: "Bot not configured" }), { status: 500 });
+      console.error("Configuration error: TELEGRAM_BOT_TOKEN not set");
+      return new Response(JSON.stringify({ error: "Service temporarily unavailable" }), { status: 503 });
     }
 
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured");
-      return new Response(JSON.stringify({ error: "AI not configured" }), { status: 500 });
+      console.error("Configuration error: LOVABLE_API_KEY not set");
+      return new Response(JSON.stringify({ error: "Service temporarily unavailable" }), { status: 503 });
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -282,7 +282,34 @@ serve(async (req) => {
       const match = text.match(pattern);
       if (match) {
         const amount = parseFloat(match[1].replace(",", "."));
-        const description = match[2].trim();
+        let description = match[2].trim();
+
+        // Validate amount - must be between 0.01 and 1,000,000
+        if (isNaN(amount) || amount < 0.01 || amount > 1000000) {
+          await sendTelegramMessage(
+            TELEGRAM_BOT_TOKEN,
+            chatId,
+            "❌ Valor inválido. Use valores entre R$0,01 e R$1.000.000"
+          );
+          return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+        }
+
+        // Sanitize description - limit to 200 characters
+        if (description.length > 200) {
+          description = description.substring(0, 200);
+        }
+
+        // Remove any potentially harmful characters from description
+        description = description.replace(/[<>\"'&]/g, "");
+
+        if (!description || description.length < 1) {
+          await sendTelegramMessage(
+            TELEGRAM_BOT_TOKEN,
+            chatId,
+            "❌ Descrição inválida. Informe onde você gastou."
+          );
+          return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+        }
 
         // Insert transaction
         const { error: insertError } = await supabase.from("transactions").insert({
@@ -336,9 +363,10 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
   } catch (error) {
-    console.error("Telegram webhook error:", error);
+    const errorId = crypto.randomUUID();
+    console.error(`Telegram webhook error [${errorId}]:`, error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "An error occurred", error_id: errorId }),
       { status: 500, headers: corsHeaders }
     );
   }

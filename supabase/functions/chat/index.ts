@@ -96,7 +96,11 @@ serve(async (req) => {
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      console.error("Configuration error: LOVABLE_API_KEY not set");
+      return new Response(JSON.stringify({ error: "Service temporarily unavailable" }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Get user financial context using service role key for data access
@@ -175,9 +179,10 @@ Lazer protegido: R$ ${leisure?.monthly_amount ? Number(leisure.monthly_amount).t
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (error) {
-    console.error("Chat error:", error);
+    const errorId = crypto.randomUUID();
+    console.error(`Chat error [${errorId}]:`, error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "An error occurred", error_id: errorId }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

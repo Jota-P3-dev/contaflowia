@@ -40,6 +40,18 @@ export function TelegramConnect() {
     setIsConnected(!!profile?.telegram_chat_id);
   };
 
+  const generateSecureCode = (): string => {
+    // Use cryptographically secure random generation
+    const array = new Uint8Array(8);
+    crypto.getRandomValues(array);
+    // Convert to base36 and take 8 characters for better security
+    return Array.from(array)
+      .map(b => (b % 36).toString(36))
+      .join('')
+      .toUpperCase()
+      .substring(0, 8);
+  };
+
   const generateLinkCode = async () => {
     if (!user) return;
 
@@ -53,8 +65,8 @@ export function TelegramConnect() {
         .eq("user_id", user.id)
         .eq("used", false);
 
-      // Generate a new 6-character code
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      // Generate a new 8-character cryptographically secure code
+      const code = generateSecureCode();
       const expiresAtDate = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
       const { error } = await supabase.from("telegram_link_codes").insert({
