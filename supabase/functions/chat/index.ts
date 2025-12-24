@@ -57,40 +57,72 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, userId } = await req.json();
+    // Extract and validate JWT token from Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Missing or invalid authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Initialize Supabase client to verify the token and get user
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    
+    // Use anon key client to verify the user's token
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+    
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    // Use the authenticated user's ID - not from request body
+    const userId = user.id;
+    console.log("Authenticated user:", userId);
+
+    const { messages } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Get user financial context if userId is provided
+    // Get user financial context using service role key for data access
     let userContext = "Dados financeiros não disponíveis ainda.";
     
-    if (userId) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-      const [profileResult, debtsResult, goalsResult, leisureResult, incomesResult] = await Promise.all([
-        supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-        supabase.from("debts").select("*").eq("user_id", userId).eq("is_paid", false),
-        supabase.from("goals").select("*").eq("user_id", userId).eq("is_achieved", false),
-        supabase.from("leisure_budget").select("*").eq("user_id", userId).maybeSingle(),
-        supabase.from("income_sources").select("*").eq("user_id", userId),
-      ]);
+    const [profileResult, debtsResult, goalsResult, leisureResult, incomesResult] = await Promise.all([
+      supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+      supabase.from("debts").select("*").eq("user_id", userId).eq("is_paid", false),
+      supabase.from("goals").select("*").eq("user_id", userId).eq("is_achieved", false),
+      supabase.from("leisure_budget").select("*").eq("user_id", userId).maybeSingle(),
+      supabase.from("income_sources").select("*").eq("user_id", userId),
+    ]);
 
-      const profile = profileResult.data;
-      const debts = debtsResult.data || [];
-      const goals = goalsResult.data || [];
-      const leisure = leisureResult.data;
-      const incomes = incomesResult.data || [];
+    const profile = profileResult.data;
+    const debts = debtsResult.data || [];
+    const goals = goalsResult.data || [];
+    const leisure = leisureResult.data;
+    const incomes = incomesResult.data || [];
 
-      const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
-      const totalDebt = debts.reduce((sum, d) => sum + Number(d.remaining_amount), 0);
-      const monthlyDebtPayment = debts.reduce((sum, d) => sum + Number(d.monthly_payment || 0), 0);
+    const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
+    const totalDebt = debts.reduce((sum, d) => sum + Number(d.remaining_amount), 0);
+    const monthlyDebtPayment = debts.reduce((sum, d) => sum + Number(d.monthly_payment || 0), 0);
 
-      userContext = `
+    userContext = `
 Nome: ${profile?.name || "Não informado"}
 Renda mensal: R$ ${totalIncome.toFixed(2)}
 Total de dívidas: R$ ${totalDebt.toFixed(2)}
@@ -99,7 +131,6 @@ Dívidas ativas: ${debts.length > 0 ? debts.map(d => `${d.name} (R$ ${Number(d.r
 Metas ativas: ${goals.length > 0 ? goals.map(g => `${g.name} (${((Number(g.current_amount) / Number(g.target_amount)) * 100).toFixed(0)}%)`).join(", ") : "Nenhuma"}
 Lazer protegido: R$ ${leisure?.monthly_amount ? Number(leisure.monthly_amount).toFixed(2) : "Não definido"}
 `.trim();
-    }
 
     const systemPrompt = FIN_SYSTEM_PROMPT.replace("{userContext}", userContext);
 
